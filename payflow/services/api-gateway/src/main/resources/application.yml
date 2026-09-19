@@ -1,0 +1,95 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: api-gateway
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${KEYCLOAK_ISSUER_URI:http://localhost:8088/realms/paynexus}
+          jwk-set-uri: ${KEYCLOAK_JWK_SET_URI:${KEYCLOAK_ISSUER_URI:http://localhost:8088/realms/paynexus}/protocol/openid-connect/certs}
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+  cloud:
+    gateway:
+      default-filters:
+        - name: RequestRateLimiter
+          args:
+            redis-rate-limiter.replenishRate: 30
+            redis-rate-limiter.burstCapacity: 60
+            key-resolver: "#{@userKeyResolver}"
+      routes:
+        - id: user-auth
+          uri: ${USER_URL:http://localhost:8081}
+          predicates:
+            - Path=/api/v1/auth/**
+        - id: user-service
+          uri: ${USER_URL:http://localhost:8081}
+          predicates:
+            - Path=/api/v1/users/**
+        - id: payment-service
+          uri: ${PAYMENT_URL:http://localhost:8082}
+          predicates:
+            - Path=/api/v1/payments/**
+        - id: wallet-service
+          uri: ${WALLET_URL:http://localhost:8083}
+          predicates:
+            - Path=/api/v1/wallets/**
+        - id: fraud-service
+          uri: ${FRAUD_URL:http://localhost:8084}
+          predicates:
+            - Path=/api/v1/fraud/**
+        - id: notification-service
+          uri: ${NOTIFICATION_URL:http://localhost:8085}
+          predicates:
+            - Path=/api/v1/notifications/**
+        - id: transaction-service
+          uri: ${TRANSACTION_URL:http://localhost:8086}
+          predicates:
+            - Path=/api/v1/transactions/**
+
+payflow:
+  cors:
+    allowed-origin-patterns: ${CORS_ALLOWED_ORIGIN_PATTERNS:http://localhost,http://localhost:*,http://127.0.0.1:*}
+  services:
+    user-url: ${USER_URL:http://localhost:8081}
+    payment-url: ${PAYMENT_URL:http://localhost:8082}
+    wallet-url: ${WALLET_URL:http://localhost:8083}
+    fraud-url: ${FRAUD_URL:http://localhost:8084}
+    notification-url: ${NOTIFICATION_URL:http://localhost:8085}
+    transaction-url: ${TRANSACTION_URL:http://localhost:8086}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,gateway,metrics
+  endpoint:
+    health:
+      show-details: when_authorized
+      roles: ADMIN
+  metrics:
+    tags:
+      application: ${spring.application.name}
+  tracing:
+    sampling:
+      probability: ${TRACING_SAMPLING_PROBABILITY:1.0}
+    baggage:
+      remote-fields: paymentId,userId
+      correlation:
+        fields: paymentId,userId
+  otlp:
+    tracing:
+      endpoint: ${OTEL_EXPORTER_OTLP_TRACES_ENDPOINT:http://localhost:4318/v1/traces}
+  prometheus:
+    metrics:
+      export:
+        enabled: true
+
+logging:
+  pattern:
+    console: "%d{ISO8601} [trace=%X{traceId:-} span=%X{spanId:-} correlation=%X{correlationId:-} payment=%X{paymentId:-} user=%X{userId:-}] %-5level [%thread] %logger{36} - %msg%n"

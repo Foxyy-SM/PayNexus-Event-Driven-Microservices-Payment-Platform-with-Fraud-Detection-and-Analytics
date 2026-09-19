@@ -1,0 +1,28 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+generatorOptions:
+  disableNameSuffixHash: true
+
+configMapGenerator:
+  - name: keycloak-realm
+    namespace: paynexus
+    files:
+      - realm-export.json=../keycloak/realm-export.json
+  - name: grafana-dashboard
+    namespace: paynexus
+    files:
+      - payflow.json=../observability/grafana/dashboards/payflow.json
+  - name: grafana-dashboard-provider
+    namespace: paynexus
+    files:
+      - dashboards.yaml=../observability/grafana/provisioning/dashboards/dashboards.yml
+
+resources:
+  - namespace.yaml
+  - config.yaml
+  - infra.yaml
+  - observability.yaml
+  - services.yaml
+  - payment-and-gateway.yaml
+  - runtime.yaml

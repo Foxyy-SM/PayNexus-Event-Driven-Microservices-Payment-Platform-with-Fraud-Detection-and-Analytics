@@ -1,0 +1,105 @@
+server:
+  port: 8082
+
+spring:
+  application:
+    name: payment-service
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${KEYCLOAK_ISSUER_URI:http://localhost:8088/realms/paynexus}
+          jwk-set-uri: ${KEYCLOAK_JWK_SET_URI:${KEYCLOAK_ISSUER_URI:http://localhost:8088/realms/paynexus}/protocol/openid-connect/certs}
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:paynexus_payments}
+    username: ${DB_USER:paynexus}
+    password: ${DB_PASSWORD:paynexus}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+  flyway:
+    enabled: true
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+  kafka:
+    bootstrap-servers: ${KAFKA_BROKERS:localhost:9092}
+    template:
+      observation-enabled: true
+    listener:
+      observation-enabled: true
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+
+payflow:
+  security:
+    client:
+      token-uri: ${KEYCLOAK_TOKEN_URI:http://localhost:8088/realms/paynexus/protocol/openid-connect/token}
+      client-id: ${KEYCLOAK_CLIENT_ID:payment-service}
+      client-secret: ${KEYCLOAK_PAYMENT_CLIENT_SECRET}
+  clients:
+    wallet-url: ${WALLET_URL:http://localhost:8083}
+    fraud-url: ${FRAUD_URL:http://localhost:8084}
+  reconciliation:
+    interval: ${RECONCILIATION_INTERVAL:PT5M}
+    stale-threshold: ${RECONCILIATION_STALE_THRESHOLD:PT30M}
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      fraudService:
+        slidingWindowSize: 10
+        failureRateThreshold: 50
+        waitDurationInOpenState: 10s
+        permittedNumberOfCallsInHalfOpenState: 2
+        automaticTransitionFromOpenToHalfOpenEnabled: true
+        registerHealthIndicator: true
+      walletService:
+        slidingWindowSize: 10
+        failureRateThreshold: 50
+        waitDurationInOpenState: 10s
+        permittedNumberOfCallsInHalfOpenState: 2
+        automaticTransitionFromOpenToHalfOpenEnabled: true
+        registerHealthIndicator: true
+  retry:
+    instances:
+      fraudService:
+        maxAttempts: 2
+        waitDuration: 200ms
+      walletService:
+        maxAttempts: 2
+        waitDuration: 100ms
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,metrics,circuitbreakers,circuitbreakerevents
+  endpoint:
+    health:
+      show-details: when_authorized
+      roles: ADMIN
+  metrics:
+    tags:
+      application: ${spring.application.name}
+  tracing:
+    sampling:
+      probability: ${TRACING_SAMPLING_PROBABILITY:1.0}
+    baggage:
+      remote-fields: paymentId,userId
+      correlation:
+        fields: paymentId,userId
+  otlp:
+    tracing:
+      endpoint: ${OTEL_EXPORTER_OTLP_TRACES_ENDPOINT:http://localhost:4318/v1/traces}
+  prometheus:
+    metrics:
+      export:
+        enabled: true
+
+logging:
+  pattern:
+    console: "%d{ISO8601} [trace=%X{traceId:-} span=%X{spanId:-} correlation=%X{correlationId:-} payment=%X{paymentId:-} user=%X{userId:-}] %-5level [%thread] %logger{36} - %msg%n"

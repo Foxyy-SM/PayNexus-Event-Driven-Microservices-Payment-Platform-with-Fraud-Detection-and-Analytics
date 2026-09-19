@@ -1,0 +1,23 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: paynexus-config
+  namespace: paynexus
+data:
+  KAFKA_BROKERS: kafka.paynexus.svc.cluster.local:9092
+  REDIS_HOST: redis.paynexus.svc.cluster.local
+  REDIS_PORT: "6379"
+  DB_HOST: postgres.paynexus.svc.cluster.local
+  DB_PORT: "5432"
+  DB_USER: paynexus
+  KEYCLOAK_ISSUER_URI: https://auth.paynexus.example/realms/paynexus
+  KEYCLOAK_JWK_SET_URI: http://keycloak.paynexus.svc.cluster.local:8080/realms/paynexus/protocol/openid-connect/certs
+  KEYCLOAK_TOKEN_URI: http://keycloak.paynexus.svc.cluster.local:8080/realms/paynexus/protocol/openid-connect/token
+  OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: http://jaeger.paynexus.svc.cluster.local:4318/v1/traces
+  USER_URL: http://user-service.paynexus.svc.cluster.local:8081
+  PAYMENT_URL: http://payment-service.paynexus.svc.cluster.local:8082
+  WALLET_URL: http://wallet-service.paynexus.svc.cluster.local:8083
+  FRAUD_URL: http://fraud-service.paynexus.svc.cluster.local:8084
+  NOTIFICATION_URL: http://notification-service.paynexus.svc.cluster.local:8085
+  TRANSACTION_URL: http://transaction-service.paynexus.svc.cluster.local:8086
+  CORS_ALLOWED_ORIGIN_PATTERNS: https://web.paynexus.example

@@ -1,0 +1,136 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: keycloak
+  namespace: paynexus
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: keycloak }
+  template:
+    metadata:
+      labels: { app: keycloak }
+    spec:
+      initContainers:
+        - name: render-realm
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - |
+              set -eu
+              sed "s/\${KEYCLOAK_PAYMENT_CLIENT_SECRET}/${KEYCLOAK_PAYMENT_CLIENT_SECRET}/g" \
+                /in/realm-export.json > /out/realm-export.json
+          env:
+            - name: KEYCLOAK_PAYMENT_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef: { name: paynexus-secrets, key: KEYCLOAK_PAYMENT_CLIENT_SECRET }
+          volumeMounts:
+            - { name: realm-source, mountPath: /in, readOnly: true }
+            - { name: realm-rendered, mountPath: /out }
+      containers:
+        - name: keycloak
+          image: quay.io/keycloak/keycloak:26.0
+          args: ["start", "--import-realm", "--http-enabled=true", "--http-port=8080", "--hostname=https://auth.paynexus.example", "--proxy-headers=xforwarded"]
+          env:
+            - name: KC_BOOTSTRAP_ADMIN_USERNAME
+              valueFrom:
+                secretKeyRef: { name: paynexus-secrets, key: KEYCLOAK_ADMIN }
+            - name: KC_BOOTSTRAP_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: paynexus-secrets, key: KEYCLOAK_ADMIN_PASSWORD }
+            - name: KEYCLOAK_PAYMENT_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef: { name: paynexus-secrets, key: KEYCLOAK_PAYMENT_CLIENT_SECRET }
+            - { name: KC_HEALTH_ENABLED, value: "true" }
+          ports:
+            - { name: http, containerPort: 8080 }
+            - { name: management, containerPort: 9000 }
+          volumeMounts:
+            - name: realm-rendered
+              mountPath: /opt/keycloak/data/import
+          readinessProbe:
+            httpGet: { path: /health/ready, port: management }
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          resources:
+            requests: { cpu: 250m, memory: 512Mi }
+            limits: { cpu: "1", memory: 1Gi }
+      volumes:
+        - name: realm-source
+          configMap:
+            name: keycloak-realm
+        - name: realm-rendered
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: keycloak
+  namespace: paynexus
+spec:
+  selector: { app: keycloak }
+  ports:
+    - { name: http, port: 8080, targetPort: http }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+  namespace: paynexus
+spec:
+  replicas: 2
+  selector:
+    matchLabels: { app: web }
+  template:
+    metadata:
+      labels: { app: web }
+    spec:
+      containers:
+        - name: web
+          image: paynexus/web:1.0.0
+          ports: [{ name: http, containerPort: 80 }]
+          readinessProbe:
+            httpGet: { path: /, port: http }
+          resources:
+            requests: { cpu: 50m, memory: 64Mi }
+            limits: { cpu: 250m, memory: 256Mi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: web
+  namespace: paynexus
+spec:
+  selector: { app: web }
+  ports:
+    - { name: http, port: 80, targetPort: http }
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: paynexus
+  namespace: paynexus
+spec:
+  tls:
+    - hosts: [web.paynexus.example, auth.paynexus.example]
+      secretName: paynexus-tls
+  rules:
+    - host: web.paynexus.example
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: web
+                port: { name: http }
+    - host: auth.paynexus.example
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: keycloak
+                port: { name: http }

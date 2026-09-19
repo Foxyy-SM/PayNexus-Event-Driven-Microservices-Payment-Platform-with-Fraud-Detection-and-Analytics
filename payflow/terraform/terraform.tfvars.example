@@ -1,0 +1,7 @@
+region            = "ap-south-1"
+project           = "paynexus"
+# Prefer TF_VAR_* environment variables or your CI secret store. Do not commit real values.
+database_password              = "SET_VIA_TF_VAR_database_password"
+keycloak_admin_password        = "SET_VIA_TF_VAR_keycloak_admin_password"
+keycloak_payment_client_secret = "SET_VIA_TF_VAR_keycloak_payment_client_secret"
+grafana_admin_password         = "SET_VIA_TF_VAR_grafana_admin_password"

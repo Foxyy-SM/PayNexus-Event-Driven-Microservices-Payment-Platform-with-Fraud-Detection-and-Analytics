@@ -1,0 +1,109 @@
+### PayNexus resilience requests
+### Override these variables in your HTTP-client environment.
+@apiBaseUrl = http://localhost:8080
+@keycloakBaseUrl = http://localhost:8088
+@realm = paynexus
+@clientId = paynexus-cli
+@username = demo@paynexus.local
+@password = Demo123!
+@amountMinor = 1499
+
+### Acquire a local-demo Keycloak token
+# @name token
+POST {{keycloakBaseUrl}}/realms/{{realm}}/protocol/openid-connect/token
+Content-Type: application/x-www-form-urlencoded
+
+grant_type=password&client_id={{clientId}}&username={{username}}&password={{password}}
+
+> {%
+  client.test("Keycloak issued an access token", function () {
+    client.assert(response.status === 200, "Expected HTTP 200");
+    client.assert(Boolean(response.body.access_token), "Missing access_token");
+  });
+%}
+
+### Create a payment with integer minor units
+# @name createPayment
+POST {{apiBaseUrl}}/api/v1/payments
+Authorization: Bearer {{token.response.body.access_token}}
+Content-Type: application/json
+Accept: application/json
+Idempotency-Key: resilience-http-001
+
+{
+  "amountMinor": {{amountMinor}},
+  "currency": "USD",
+  "merchantId": "RESILIENCE-HTTP"
+}
+
+> {%
+  client.test("Payment was accepted", function () {
+    client.assert([200, 201, 202].includes(response.status), "Expected 200, 201, or 202");
+    client.assert(Boolean(response.body.paymentId || response.body.id), "Missing payment identifier");
+    client.global.set("paymentId", response.body.paymentId || response.body.id);
+  });
+%}
+
+### Replay the exact request and idempotency key
+POST {{apiBaseUrl}}/api/v1/payments
+Authorization: Bearer {{token.response.body.access_token}}
+Content-Type: application/json
+Accept: application/json
+Idempotency-Key: resilience-http-001
+
+{
+  "amountMinor": {{amountMinor}},
+  "currency": "USD",
+  "merchantId": "RESILIENCE-HTTP"
+}
+
+> {%
+  client.test("Replay returns the original payment", function () {
+    client.assert([200, 201, 202].includes(response.status), "Expected 200, 201, or 202");
+    client.assert(
+      (response.body.paymentId || response.body.id) === client.global.get("paymentId"),
+      "Replay returned a different payment"
+    );
+  });
+%}
+
+### Read payment state (expect PENDING_REVIEW while fraud is unavailable)
+GET {{apiBaseUrl}}/api/v1/payments/{{paymentId}}
+Authorization: Bearer {{token.response.body.access_token}}
+Accept: application/json
+
+> {%
+  client.test("Payment is available for review/recovery", function () {
+    client.assert(response.status === 200, "Expected HTTP 200");
+    client.assert(
+      ["PENDING_REVIEW", "PROCESSING", "COMPLETED"].includes(response.body.status),
+      "Unexpected recovery state: " + response.body.status
+    );
+  });
+%}
+
+### Submit a sampled W3C trace (replace IDs to avoid reusing a trace)
+# @name tracedPayment
+POST {{apiBaseUrl}}/api/v1/payments
+Authorization: Bearer {{token.response.body.access_token}}
+Content-Type: application/json
+Accept: application/json
+Idempotency-Key: resilience-trace-001
+traceparent: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01
+
+{
+  "amountMinor": 3299,
+  "currency": "USD",
+  "merchantId": "TRACING-DEMO"
+}
+
+> {%
+  client.test("Traced payment was accepted", function () {
+    client.assert([200, 201, 202].includes(response.status), "Expected 200, 201, or 202");
+  });
+%}
+
+### Inspect notifications after retries/recovery
+GET {{apiBaseUrl}}/api/v1/notifications/me
+Authorization: Bearer {{token.response.body.access_token}}
+Accept: application/json
