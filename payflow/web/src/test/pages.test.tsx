@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { api } from '../api'
-import { AdminReviews, Dashboard, Pay, Reconciliation, Status, Transactions } from '../pages'
+import { AdminReviews, Analytics, Dashboard, Pay, Reconciliation, Status, Transactions } from '../pages'
 
 function renderPage(component: React.ReactNode) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } })
@@ -82,5 +82,12 @@ describe('admin operations', () => {
     expect(await screen.findByText('All core systems operational')).toBeInTheDocument()
     expect(screen.getByText('Fraud intelligence')).toBeInTheDocument()
     expect(screen.getByText('DEGRADED')).toBeInTheDocument()
+  })
+
+  it('shows analytics pipeline state', async () => {
+    renderPage(<Analytics />)
+    expect(await screen.findByText('Payment analytics')).toBeInTheDocument()
+    expect(screen.getByText('No analytics yet')).toBeInTheDocument()
+    expect(screen.getByText('Raw events')).toBeInTheDocument()
   })
 })

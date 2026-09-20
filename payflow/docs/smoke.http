@@ -54,3 +54,22 @@ Content-Type: application/json
 {
   "question": "What fraud policy applies to international transactions above 2 lakh?"
 }
+
+### Acquire operator token for analytics
+# @name adminToken
+POST {{keycloak}}/realms/paynexus/protocol/openid-connect/token
+Content-Type: application/x-www-form-urlencoded
+
+grant_type=password&client_id={{clientId}}&username=admin@paynexus.local&password=Admin123!
+
+### Analytics daily KPIs
+GET {{base}}/api/v1/analytics/kpis
+Authorization: Bearer {{adminToken.response.body.access_token}}
+
+### Analytics ledger integrity
+GET {{base}}/api/v1/analytics/ledger-integrity
+Authorization: Bearer {{adminToken.response.body.access_token}}
+
+### Analytics pipeline status
+GET {{base}}/api/v1/analytics/pipeline-status
+Authorization: Bearer {{adminToken.response.body.access_token}}

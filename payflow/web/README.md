@@ -34,6 +34,7 @@ The typed client in `src/api.ts` targets:
 - `/api/v1/fraud/transactions/{paymentId}/risk-analysis`
 - `/api/v1/notifications/me`
 - `/api/v1/payments/admin/reconciliation/mismatches`
+- `/api/v1/analytics/kpis` and `/api/v1/analytics/pipeline-status`
 - `/api/v1/system/status`
 
 Money is represented as integer minor units. Payment submissions include a client-generated UUID idempotency key.

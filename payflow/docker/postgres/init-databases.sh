@@ -7,4 +7,5 @@ psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" <<-EOSQL
     CREATE DATABASE paynexus_fraud;
     CREATE DATABASE paynexus_notifications;
     CREATE DATABASE paynexus_transactions;
+    CREATE DATABASE paynexus_analytics;
 EOSQL

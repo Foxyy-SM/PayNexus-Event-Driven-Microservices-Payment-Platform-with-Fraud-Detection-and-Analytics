@@ -10,6 +10,25 @@ permissions:
   packages: write
 
 jobs:
+  analytics:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/analytics-service
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: services/analytics-service/pyproject.toml
+      - name: Install analytics service
+        run: pip install -e ".[dev]"
+      - name: Lint and test analytics pipeline
+        run: |
+          ruff check app tests
+          pytest --cov=app --cov-report=term-missing --cov-fail-under=75
+
   test:
     runs-on: ubuntu-latest
     steps:
@@ -35,7 +54,7 @@ jobs:
           npm run test:e2e
 
   integration:
-    needs: test
+    needs: [test, analytics]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -46,6 +65,7 @@ jobs:
           curl --fail --retry 20 --retry-delay 3 http://localhost:8080/actuator/health
           curl --fail --retry 20 --retry-delay 3 http://localhost/
           curl --fail --retry 20 --retry-delay 3 http://localhost:8088/realms/paynexus/.well-known/openid-configuration
+          curl --fail --retry 20 --retry-delay 3 http://localhost:8087/health
       - name: Runtime logs
         if: failure()
         run: docker compose --env-file .env.example logs --no-color
@@ -64,7 +84,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   images:
-    needs: [test, secrets]
+    needs: [test, analytics, secrets]
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -77,6 +97,7 @@ jobs:
           - fraud-service
           - notification-service
           - transaction-service
+          - analytics-service
           - web
     steps:
       - uses: actions/checkout@v4
@@ -91,6 +112,9 @@ jobs:
               --build-arg VITE_KEYCLOAK_REALM=paynexus \
               --build-arg VITE_KEYCLOAK_CLIENT_ID=paynexus-web \
               -t "$IMAGE" web
+          elif [ "${{ matrix.service }}" = analytics-service ]; then
+            docker build -f services/analytics-service/Dockerfile \
+              -t "$IMAGE" services/analytics-service
           else
             docker build -f docker/Dockerfile --build-arg "SERVICE=${{ matrix.service }}" -t "$IMAGE" .
           fi

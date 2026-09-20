@@ -1,12 +1,13 @@
 import { useState, type ReactNode } from 'react'
 import { NavLink, Route, Routes, useLocation } from 'react-router-dom'
 import {
-  Activity, Bell, BookOpen, ChevronRight, CircleDollarSign, CreditCard, Gauge, Landmark,
-  LayoutDashboard, LogOut, Menu, ScanSearch, Send, ShieldCheck, UserRound, WalletCards, X,
+  Activity, BarChart3, Bell, BookOpen, ChevronRight, CircleDollarSign, CreditCard, Gauge,
+  Landmark, LayoutDashboard, LogOut, Menu, ScanSearch, Send, ShieldCheck, UserRound,
+  WalletCards, X,
 } from 'lucide-react'
 import { useAuth, RequireAuth } from './auth'
 import {
-  AdminReviews, Dashboard, Landing, Notifications, Pay, Profile, Reconciliation,
+  AdminReviews, Analytics, Dashboard, Landing, Notifications, Pay, Profile, Reconciliation,
   Status, Transactions, Wallet,
 } from './pages'
 
@@ -21,6 +22,7 @@ const mainNav = [
 const opsNav = [
   { to: '/admin/fraud', label: 'Fraud reviews', icon: ScanSearch },
   { to: '/admin/reconciliation', label: 'Reconciliation', icon: Landmark },
+  { to: '/admin/analytics', label: 'Analytics', icon: BarChart3 },
   { to: '/status', label: 'System status', icon: Gauge },
 ]
 
@@ -89,6 +91,7 @@ export function App() {
     <Route path="/profile" element={<Protected><Profile /></Protected>} />
     <Route path="/admin/fraud" element={<Protected admin><AdminReviews /></Protected>} />
     <Route path="/admin/reconciliation" element={<Protected admin><Reconciliation /></Protected>} />
+    <Route path="/admin/analytics" element={<Protected admin><Analytics /></Protected>} />
     <Route path="/status" element={<Protected><Status /></Protected>} />
   </Routes>
 }

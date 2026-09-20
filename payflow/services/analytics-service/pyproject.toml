@@ -1,0 +1,49 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "paynexus-analytics"
+version = "1.0.0"
+description = "Kafka-backed payment analytics and data-quality API for PayNexus"
+requires-python = ">=3.12"
+dependencies = [
+  "aiokafka==0.12.0",
+  "asyncpg==0.30.0",
+  "fastapi==0.115.12",
+  "httpx==0.28.1",
+  "pandas==2.2.3",
+  "pydantic-settings==2.8.1",
+  "PyJWT[crypto]==2.10.1",
+  "sqlalchemy[asyncio]==2.0.40",
+  "uvicorn[standard]==0.34.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "aiosqlite==0.21.0",
+  "pytest==8.3.5",
+  "pytest-asyncio==0.26.0",
+  "pytest-cov==6.1.1",
+  "ruff==0.11.2",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["app"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+testpaths = ["tests"]
+
+[tool.coverage.run]
+source = ["app"]
+omit = ["app/main.py"]
+
+[tool.ruff]
+line-length = 110
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+ignore = ["B008"]

@@ -20,4 +20,5 @@ data:
   FRAUD_URL: http://fraud-service.paynexus.svc.cluster.local:8084
   NOTIFICATION_URL: http://notification-service.paynexus.svc.cluster.local:8085
   TRANSACTION_URL: http://transaction-service.paynexus.svc.cluster.local:8086
+  ANALYTICS_URL: http://analytics-service.paynexus.svc.cluster.local:8087
   CORS_ALLOWED_ORIGIN_PATTERNS: https://web.paynexus.example

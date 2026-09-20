@@ -35,7 +35,7 @@ services:
       - postgres_data:/var/lib/postgresql/data
       - ./docker/postgres/init-databases.sh:/docker-entrypoint-initdb.d/init-databases.sh:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U payflow -d postgres"]
+      test: ["CMD-SHELL", "pg_isready -U paynexus -d postgres"]
       interval: 5s
       timeout: 5s
       retries: 20
@@ -50,26 +50,49 @@ services:
       timeout: 3s
       retries: 20
 
+  analytics-db-init:
+    image: postgres:16-alpine
+    restart: "no"
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    depends_on:
+      postgres: { condition: service_healthy }
+    command:
+      - /bin/sh
+      - -ec
+      - |
+        exists=$$(psql -h postgres -U paynexus -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname='paynexus_analytics'")
+        if [ "$$exists" != "1" ]; then
+          psql -h postgres -U paynexus -d postgres -c "CREATE DATABASE paynexus_analytics"
+        fi
+
   kafka:
     image: apache/kafka:3.9.0
+    hostname: kafka
     restart: unless-stopped
-    ports: ["9092:9092"]
+    # 9092 is the in-network listener; 29092 is advertised to host clients.
+    ports: ["9092:9092", "29092:29092"]
     environment:
       KAFKA_NODE_ID: "1"
       KAFKA_PROCESS_ROLES: broker,controller
-      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_LISTENERS: PLAINTEXT://:9092,PLAINTEXT_HOST://:29092,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
       KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
       KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_LOG_DIRS: /tmp/kraft-combined-logs
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: "1"
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: "1"
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: "1"
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: "0"
       CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
+      KAFKA_HEAP_OPTS: ${KAFKA_HEAP_OPTS:--Xms256m -Xmx512m}
     healthcheck:
       test: ["CMD-SHELL", "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list"]
+      start_period: 45s
       interval: 10s
-      timeout: 10s
+      timeout: 20s
       retries: 20
 
   keycloak:
@@ -166,6 +189,30 @@ services:
     environment: { <<: *service-env, OTEL_SERVICE_NAME: transaction-service, DB_NAME: paynexus_transactions }
     ports: ["8086:8086"]
 
+  analytics-service:
+    build:
+      context: ./services/analytics-service
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_USER: paynexus
+      DB_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      DB_NAME: paynexus_analytics
+      KAFKA_BROKERS: kafka:9092
+      KAFKA_GROUP_ID: paynexus-analytics-v1
+      KEYCLOAK_ISSUER_URI: http://localhost:8088/realms/paynexus
+      KEYCLOAK_JWK_SET_URI: http://keycloak:8080/realms/paynexus/protocol/openid-connect/certs
+      ANALYTICS_REFRESH_SECONDS: ${ANALYTICS_REFRESH_SECONDS:-30}
+      INBOX_DIRECTORY: /app/inbox
+    depends_on:
+      postgres: { condition: service_healthy }
+      analytics-db-init: { condition: service_completed_successfully }
+      kafka: { condition: service_healthy }
+      keycloak: { condition: service_healthy }
+    ports: ["8087:8087"]
+
   api-gateway:
     <<: *service
     build: { context: ., dockerfile: docker/Dockerfile, args: { SERVICE: api-gateway } }
@@ -178,6 +225,7 @@ services:
       FRAUD_URL: http://fraud-service:8084
       NOTIFICATION_URL: http://notification-service:8085
       TRANSACTION_URL: http://transaction-service:8086
+      ANALYTICS_URL: http://analytics-service:8087
       CORS_ALLOWED_ORIGIN_PATTERNS: ${CORS_ALLOWED_ORIGIN_PATTERNS:-http://localhost,http://localhost:*,http://127.0.0.1:*}
     ports: ["8080:8080"]
 

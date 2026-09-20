@@ -3,8 +3,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, Navigate } from 'react-router-dom'
 import {
   Activity, ArrowDownLeft, ArrowRight, ArrowUpRight, Bell, Check, CheckCircle2, CircleAlert,
-  Clock3, Copy, CreditCard, Fingerprint, Gauge, Landmark, LockKeyhole, Search, ShieldCheck,
-  ShieldQuestion, Sparkles, UserCheck, WalletCards, X, XCircle, Zap,
+  Clock3, Copy, CreditCard, Database, Fingerprint, Gauge, Landmark, LockKeyhole, Search,
+  ShieldCheck, ShieldQuestion, Sparkles, UserCheck, WalletCards, X, XCircle, Zap,
 } from 'lucide-react'
 import { api } from './api'
 import { useAuth } from './auth'
@@ -149,6 +149,27 @@ export function Reconciliation() {
   if (query.isLoading) return <LoadingState />
   if (query.isError) return <ErrorState />
   return <div className="page-stack"><div className="ops-banner teal"><Landmark /><div><span className="eyebrow">Settlement integrity</span><h2>Reconciliation incidents</h2><p>Exceptions between payment state and wallet-ledger evidence.</p></div></div><section className="panel"><div className="panel-head"><div><h2>Detected mismatches</h2></div></div>{query.data?.length ? <div className="table-wrap"><table><thead><tr><th>Incident</th><th>Payment</th><th>Type</th><th>Expected evidence</th><th>Actual evidence</th><th>Repair</th><th>Status</th></tr></thead><tbody>{query.data.map((item) => <tr key={item.id}><td><strong>{item.id}</strong><small>{formatDate(item.detectedAt)}</small></td><td>{item.paymentId}</td><td>{item.mismatchType.replaceAll('_', ' ')}</td><td>{item.expectedEvidence}</td><td>{item.actualEvidence}</td><td>{item.repairAction}</td><td><StatusBadge status={item.repairStatus} /></td></tr>)}</tbody></table></div> : <EmptyState title="Books are balanced" detail="No reconciliation mismatches were detected." />}</section></div>
+}
+
+export function Analytics() {
+  const kpis = useQuery({ queryKey: ['analytics-kpis'], queryFn: api.analyticsKpis })
+  const pipeline = useQuery({ queryKey: ['analytics-pipeline'], queryFn: api.analyticsPipeline, refetchInterval: 30_000 })
+  if (kpis.isLoading || pipeline.isLoading) return <LoadingState />
+  if (kpis.isError || pipeline.isError || !kpis.data || !pipeline.data) return <ErrorState retry={() => { void kpis.refetch(); void pipeline.refetch() }} />
+  const latest = kpis.data[0]
+  return <div className="page-stack">
+    <div className="ops-banner teal"><Database /><div><span className="eyebrow">Python data plane</span><h2>Payment analytics</h2><p>Kafka events transformed into governed business marts.</p></div></div>
+    {latest ? <section className="metrics-grid">
+      <div className="metric-card"><span className="metric-icon"><Activity /></span><p>Processed volume</p><strong>{formatMoney(latest.totalVolumeMinor, latest.currency)}</strong><small>{latest.day} · {latest.currency}</small></div>
+      <div className="metric-card"><span className="metric-icon violet"><Check /></span><p>Capture rate</p><strong>{(latest.captureRate * 100).toFixed(1)}%</strong><small>{latest.completedCount} completed</small></div>
+      <div className="metric-card"><span className="metric-icon"><ShieldQuestion /></span><p>Review rate</p><strong>{(latest.reviewRate * 100).toFixed(1)}%</strong><small>{latest.reviewCount} held for review</small></div>
+    </section> : <EmptyState title="No analytics yet" detail="Create a payment and allow up to 30 seconds for the mart refresh." />}
+    <section className="panel"><div className="panel-head"><div><span className="eyebrow">Pipeline</span><h2>Ingestion status</h2></div><StatusBadge status={pipeline.data.kafkaConnected ? 'UP' : 'DEGRADED'} /></div>
+      <div className="service-list">
+        {[['Raw events', pipeline.data.rawEvents], ['Payments', pipeline.data.payments], ['Fraud assessments', pipeline.data.fraudAssessments], ['Ledger entries', pipeline.data.ledgerEntries], ['Analyst notes', pipeline.data.analystNotes]].map(([label, value]) => <div className="service-row" key={label}><span className="service-dot up" /><strong>{label}</strong><span className="latency">{value}</span></div>)}
+      </div>
+    </section>
+  </div>
 }
 
 export function Status() {

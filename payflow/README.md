@@ -1,6 +1,6 @@
 # PayNexus — Cloud-Native Payment Processing & Fraud Detection Platform
 
-Java 21 · Spring Boot 3 · React · Keycloak · Kafka · PostgreSQL · Redis · Docker · Kubernetes · Terraform · Prometheus · Grafana · OpenTelemetry · Resilience4j
+Java 21 · Spring Boot 3 · Python 3.12 · FastAPI · pandas · React · Keycloak · Kafka · PostgreSQL · Redis · Docker · Kubernetes · Terraform · Power BI · Prometheus · Grafana · OpenTelemetry
 
 PayNexus is a portfolio-grade **wallet and payment orchestration platform**: the kind of system that sits behind a fintech product, not a tutorial CRUD app. A member authorizes a payment, funds are **reserved** in a ledgered wallet, a fraud engine scores the attempt, and money is **captured only after an approve decision**. High-risk or degraded fraud paths hold the reservation for a human analyst instead of silently charging the customer.
 
@@ -49,7 +49,8 @@ Browser (React + Keycloak PKCE)
                               ├── Wallet service        :8083
                               ├── Fraud service         :8084
                               ├── Notification service  :8085
-                              └── Transaction service   :8086
+                              ├── Transaction service   :8086
+                              └── Analytics service     :8087 (Python/FastAPI)
 
 Keycloak            :8088  (container :8080)
 PostgreSQL          :5432  (one database per service)
@@ -60,7 +61,9 @@ Grafana             :3000
 Jaeger              :16686 (OTLP :4317 / :4318)
 ```
 
-There are **seven backend runtimes on purpose**. Each owns a bounded context. Fifteen microservices for a portfolio piece is theatre.
+There are **eight backend runtimes on purpose**. Seven Java runtimes provide the gateway and transactional
+bounded contexts; the Python analytics runtime is a read-only data plane. Fifteen microservices for a
+portfolio piece is theatre.
 
 Internal Java packages and Maven coordinates still use `com.payflow` / `payflow-*` so module IDs stay stable. Product name, UI, realm, docs, Kubernetes namespace, and demo identities are **PayNexus**.
 
@@ -156,6 +159,14 @@ Consumes notification events, retries, and dead-letters poison messages (`notifi
 
 CQRS-lite **read model**. Payment remains the write model. This service projects events into a searchable, paginated store (`status`, merchant, time). History can lag the synchronous payment API by a short interval — that is expected and is an interview talking point.
 
+### 9. Analytics service (`services/analytics-service`, port 8087)
+
+Python 3.12 + FastAPI + SQLAlchemy + pandas. It independently consumes payment, fraud, and wallet Kafka
+events into its own Postgres warehouse, builds daily KPI and risk-rule marts, and exposes admin-only REST
+and CSV contracts for Power BI. Markdown analyst notes demonstrate idempotent unstructured-data ingestion.
+It also checks completed payments against projected `CAPTURE` ledger evidence without writing to the money
+path. See [`services/analytics-service/README.md`](services/analytics-service/README.md).
+
 ### Shared libraries
 
 - `libs/common` — JWT conversion, `PayflowPrincipal`, errors, outbound HTTP timeouts, correlation
@@ -227,6 +238,7 @@ make smoke
 | http://localhost:3000 | Grafana |
 | http://localhost:9090 | Prometheus |
 | http://localhost:16686 | Jaeger |
+| http://localhost:8087/docs | Analytics OpenAPI |
 
 ### 5. Sign in
 
@@ -329,6 +341,8 @@ UI-only (no backend): `VITE_DEMO_MODE=true npm run dev`.
 mvn clean verify          # unit tests always; Testcontainers ITs need Docker
 cd web && npm ci && npm run lint && npm test && npm run build
 npx playwright install chromium && npm run test:e2e
+cd services/analytics-service && pip install -e ".[dev]"
+ruff check app tests && pytest --cov=app --cov-fail-under=75
 ```
 
 ### Issuer vs JWKS (common footgun)
@@ -373,6 +387,8 @@ Java 21 · Spring Boot · Microservices · Kafka · PostgreSQL · Redis · Keycl
 - Designed an event-driven payment platform with reserve/capture/release wallet accounting, integer minor units, and per-user idempotency so retries cannot double-charge.
 - Implemented Keycloak OAuth2 (PKCE for the SPA, client credentials for service calls) and role-based admin review instead of homemade password JWTs.
 - Used a transactional outbox, Kafka read models, and conservative ledger reconciliation to close dual-write and drift gaps.
+- Built a Python/FastAPI analytics pipeline that idempotently ingests Kafka events and markdown analyst
+  notes, creates pandas/SQL marts, exposes Power BI-ready KPIs, and enforces pytest coverage in CI.
 - Applied Resilience4j, Prometheus/Grafana, and OpenTelemetry traces, with executable demos for fraud outage (hold-for-review) and wallet timeouts.
 - Containerized seven services plus a React console; added Compose, Kustomize/HPA, GitHub Actions, and a Terraform AWS skeleton.
 
@@ -415,7 +431,7 @@ These are realistic next steps, not unfinished homework disguised as vision:
 
 ```text
 libs/             shared security, errors, HTTP, event contracts
-services/         gateway + six Spring Boot services
+services/         gateway + six Spring Boot services + Python analytics service
 web/              React/Vite app and Nginx proxy
 keycloak/         realm export (paynexus)
 docker/           JVM image, Keycloak entrypoint, Postgres init

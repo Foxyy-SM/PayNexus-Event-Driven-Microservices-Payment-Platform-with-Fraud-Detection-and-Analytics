@@ -61,6 +61,16 @@ hs_err_pid*
 
 # Test
 .allure/
+.coverage
+.pytest_cache/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.bootstrap/
+.uv-cache/
+.uv-python/
 
 # Local data
 data/

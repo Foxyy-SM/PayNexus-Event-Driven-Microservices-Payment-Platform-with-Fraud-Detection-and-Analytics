@@ -1,4 +1,4 @@
-.PHONY: build test backend-test frontend-test integration up down logs smoke demo \
+.PHONY: build test backend-test frontend-test analytics-test integration up down logs smoke demo \
 	images compose-config k8s-render k8s-validate terraform-fmt terraform-validate infra-validate env
 
 COMPOSE := docker compose --env-file .env
@@ -17,12 +17,17 @@ backend-test:
 frontend-test:
 	cd web && npm ci && npm run lint && npm test && npm run build && npm run test:e2e
 
-test: backend-test frontend-test
+analytics-test:
+	cd services/analytics-service && python -m pip install -e ".[dev]" && \
+		ruff check app tests && pytest --cov=app --cov-fail-under=75
+
+test: backend-test frontend-test analytics-test
 
 images: env
 	@for service in $(SERVICES); do \
 		docker build -f docker/Dockerfile --build-arg "SERVICE=$$service" -t "paynexus/$$service:local" . || exit 1; \
 	done
+	docker build -f services/analytics-service/Dockerfile -t paynexus/analytics-service:local services/analytics-service
 	docker build -f web/Dockerfile -t paynexus/web:local web
 
 up: env
@@ -38,6 +43,7 @@ smoke:
 	curl --fail --retry 10 --retry-delay 2 http://localhost:8080/actuator/health
 	curl --fail --retry 10 --retry-delay 2 http://localhost/
 	curl --fail --retry 10 --retry-delay 2 http://localhost:8088/realms/paynexus/.well-known/openid-configuration
+	curl --fail --retry 10 --retry-delay 2 http://localhost:8087/health
 
 integration: env
 	@trap '$(COMPOSE) down --volumes' EXIT; \

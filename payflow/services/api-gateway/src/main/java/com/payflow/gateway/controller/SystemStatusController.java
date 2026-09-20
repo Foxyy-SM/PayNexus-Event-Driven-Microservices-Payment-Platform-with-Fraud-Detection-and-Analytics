@@ -28,7 +28,8 @@ public class SystemStatusController {
             @Value("${payflow.services.wallet-url}") String walletUrl,
             @Value("${payflow.services.fraud-url}") String fraudUrl,
             @Value("${payflow.services.notification-url}") String notificationUrl,
-            @Value("${payflow.services.transaction-url}") String transactionUrl) {
+            @Value("${payflow.services.transaction-url}") String transactionUrl,
+            @Value("${payflow.services.analytics-url}") String analyticsUrl) {
         this.webClient = webClient;
         this.services = new LinkedHashMap<>();
         services.put("user", userUrl);
@@ -37,6 +38,7 @@ public class SystemStatusController {
         services.put("fraud", fraudUrl);
         services.put("notification", notificationUrl);
         services.put("transaction", transactionUrl);
+        services.put("analytics", analyticsUrl);
     }
 
     @GetMapping("/status")
@@ -57,7 +59,8 @@ public class SystemStatusController {
     }
 
     private Mono<Map.Entry<String, Object>> health(String name, String baseUrl) {
-        return get(baseUrl + "/actuator/health", null)
+        String healthPath = "analytics".equals(name) ? "/health" : "/actuator/health";
+        return get(baseUrl + healthPath, null)
                 .map(body -> Map.entry(name, (Object) body))
                 .onErrorReturn(Map.entry(name, Map.of("status", "UNAVAILABLE")));
     }

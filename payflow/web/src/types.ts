@@ -105,6 +105,33 @@ export interface SystemStatus {
   checkedAt: string
 }
 
+export interface DailyKpi {
+  day: string
+  currency: Currency
+  initiatedCount: number
+  completedCount: number
+  reviewCount: number
+  failedCount: number
+  totalVolumeMinor: number
+  completedVolumeMinor: number
+  captureRate: number
+  reviewRate: number
+  refreshedAt: string
+}
+
+export interface AnalyticsPipelineStatus {
+  rawEvents: number
+  payments: number
+  fraudAssessments: number
+  ledgerEntries: number
+  analystNotes: number
+  kafkaConnected: boolean
+  processedEvents: number
+  lastEventAt?: string
+  lastRefreshAt?: string
+  lastError?: string
+}
+
 export interface Page<T> {
   content: T[]
   page: number

@@ -1,6 +1,7 @@
 import type {
-  DashboardSummary, FraudReview, LedgerEntry, Notification, Page, Payment, PaymentRequest,
-  PaymentStatus, ReconciliationMismatch, RiskAnalysis, SystemStatus, Transaction, User, Wallet,
+  AnalyticsPipelineStatus, DailyKpi, DashboardSummary, FraudReview, LedgerEntry, Notification, Page,
+  Payment, PaymentRequest, PaymentStatus, ReconciliationMismatch, RiskAnalysis, SystemStatus,
+  Transaction, User, Wallet,
 } from './types'
 
 const demoMode = (import.meta.env.VITE_DEMO_MODE ?? 'false') === 'true'
@@ -146,6 +147,11 @@ export const api = {
   },
   decideReview: (paymentId: string, action: 'approve' | 'reject') => demoMode ? wait(undefined) : request<void>(`/api/v1/payments/${paymentId}/review/${action}`, { method: 'POST' }),
   mismatches: () => demoMode ? wait(demo.mismatches) : request<RawMismatch[]>('/api/v1/payments/admin/reconciliation/mismatches'),
+  analyticsKpis: () => demoMode ? wait<DailyKpi[]>([]) : request<DailyKpi[]>('/api/v1/analytics/kpis'),
+  analyticsPipeline: () => demoMode ? wait<AnalyticsPipelineStatus>({
+    rawEvents: 0, payments: 0, fraudAssessments: 0, ledgerEntries: 0, analystNotes: 0,
+    kafkaConnected: true, processedEvents: 0,
+  }) : request<AnalyticsPipelineStatus>('/api/v1/analytics/pipeline-status'),
   status: () => demoMode ? wait<SystemStatus>({ overall: 'OPERATIONAL', checkedAt: iso(), services: [
     { name: 'Payments', status: 'UP', latencyMs: 42, circuitState: 'CLOSED' },
     { name: 'Wallets', status: 'UP', latencyMs: 31, circuitState: 'CLOSED' },
