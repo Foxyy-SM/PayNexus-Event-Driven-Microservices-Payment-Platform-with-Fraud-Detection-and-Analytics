@@ -509,21 +509,6 @@ Namespace: `paynexus`. Payment service has an HPA (2–8 replicas). Ingress host
 
 ---
 
-## Suggested resume title and bullets
-
-**PayNexus — Cloud-Native Payment Processing & Fraud Detection Platform**  
-Java 21 · Spring Boot · Microservices · Kafka · PostgreSQL · Redis · Keycloak · Kubernetes · Terraform
-
-- Designed an event-driven payment platform with reserve/capture/release wallet accounting, integer minor units, and per-user idempotency so retries cannot double-charge.
-- Implemented Keycloak OAuth2 (PKCE for the SPA, client credentials for service calls) and role-based admin review instead of homemade password JWTs.
-- Used a transactional outbox, Kafka read models, and conservative ledger reconciliation to close dual-write and drift gaps.
-- Built a Python/FastAPI analytics pipeline that idempotently ingests Kafka events and markdown analyst
-  notes, creates pandas/SQL marts, exposes Power BI-ready KPIs, and enforces pytest coverage in CI.
-- Applied Resilience4j, Prometheus/Grafana, and OpenTelemetry traces, with executable demos for fraud outage (hold-for-review) and wallet timeouts.
-- Containerized seven services plus a React console; added Compose, Kustomize/HPA, GitHub Actions, and a Terraform AWS skeleton.
-
----
-
 ## Future enhancements
 
 These are realistic next steps, not unfinished homework disguised as vision:
